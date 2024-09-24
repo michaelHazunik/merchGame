@@ -7,14 +7,24 @@
 void* visitor();
 
 int interaction(float* pBal, char item_list[4][4][16], int inv[4][4]);
+int getTradeInput(int items);
+
+
 int visitors;
 int max_visitors = 10; // Max amount of visitors before more stop arriving.
-int visitor_frequency = 30; // A new visitor will appear every x seconds.
+int visitor_frequency = 10; // A new visitor will appear every x seconds.
 
-struct of {
-    int intention;      // 0 = Buy, 1 = Sell
-    int item[3];        // Selects item {[0] = amount, [1] = category, [2] = item}
-    float price;        // Offers one price for all requested items
+struct item
+{
+    int amount;
+    int category;
+    int item;
+    float price;
+};
+
+struct offer {
+    int intention;          // 0 = Buy, 1 = Sell
+    struct item items[4];
 };
 
 int main(void)
@@ -111,58 +121,90 @@ int main(void)
 int interaction(float* pBal, char it_lst[4][4][16], int inv[4][4])
 {
     float bal = *pBal;
-    int item[3] = {rand() % 10 + 1, rand() % 4, rand() % 4};
-    struct of offer =
+    int items = rand() % 4 + 1;
+
+    struct offer offer =
     {
-        .intention = rand() % 2,
-        .item = {item[0], item[1], item[2]},
-        .price = (float) item[0] * (item[2] + 1) * (rand() % 70 + 80) / 100
+        .intention = rand() % 2
     };
 
     char intent_opts[2][4] = {"buy", "sell"};
-    printf("Hey, I would like to %s:\n  %ix %s\t(You have %i)\nfor $%.2f\t[y/n]\n", intent_opts[offer.intention], offer.item[0], it_lst[offer.item[1]][offer.item[2]], inv[offer.item[1]][offer.item[2]],offer.price);
-    char input;
-    while (1)
+    printf("Hey, I would like to %s:\n", intent_opts[offer.intention]);
+    
+    int category = rand() % 4;
+    for (int i = 0; i < items; i++)
     {
-        input = getchar();
-        if (input == 'N' || input == 'n')
+        int amount = rand() % 9 + 1, item = rand() % 4;
+        struct item temp =
         {
-            printf("Denied the offer!\nVisitor has left.\n");
-            break;
-        }
-        else if (input != 'Y' && input != 'y')
-        {
-            continue;
-        }
-
-        if (offer.intention == 1)
-        {
-            if (bal < offer.price)
-            {
-                printf("You can't afford this purchase!\nVisitor has left.\n");
-                break;
-            }
-            bal -= offer.price;
-            inv[offer.item[1]][offer.item[2]] += offer.item[0];
-            printf("You have purchased %ix %s for $%.2f!\nVisitor leaves happy.\n", offer.item[0], it_lst[offer.item[1]][offer.item[2]], offer.price);
-            break;
-        }
-        else
-        {
-            if (inv[offer.item[1]][offer.item[2]] < offer.item[0])
-            {
-                printf("You do not have enough items for this sale!\nVisitor has left.\n");
-                break;
-            }
-            bal += offer.price;
-            inv[offer.item[1]][offer.item[2]] -= offer.item[0];
-            printf("You have sold %ix %s for $%.2f!\nVisitor leaves happy.\n", offer.item[0], it_lst[offer.item[1]][offer.item[2]], offer.price);
-            break;
-        }
+            .amount = amount,
+            .category = category,
+            .item = item,
+            .price = (float) amount * (float) (item + 1) * (0.75 + (float) (rand() % 50) / 100.0)
+        };
+        printf("[%i]  $%.2f\t%ix  %s\n", i + 1, temp.price, amount, it_lst[category][item]);
+        offer.items[i] = temp;
     }
+
+    printf("Select a trade, enter 0 to deny.\n");
+
+    int tradeNum = getTradeInput(items);
+
+    if (tradeNum == 0)
+    {
+        visitors--;
+        return 0;
+    }
+
+    tradeNum--;
+
+    struct item sel_item = offer.items[tradeNum];
+
+    if (offer.intention == 1)
+    {
+        if (bal < sel_item.price)
+        {
+            printf("You can't afford this purchase!\nVisitor has left.\n");
+            return 0;
+        }
+        bal -= sel_item.price;
+        inv[sel_item.category][sel_item.item] += sel_item.amount;
+        printf("You have purchased %ix %s for $%.2f!\nVisitor leaves happy.\n", sel_item.amount, it_lst[sel_item.category][sel_item.item], sel_item.price);
+    }
+    else
+    {
+        if (inv[sel_item.category][sel_item.item] < sel_item.amount)
+        {
+            printf("You do not have enough items for this sale!\nVisitor has left.\n");
+            return 0;
+        }
+        bal += sel_item.price;
+        inv[sel_item.category][sel_item.item] -= sel_item.amount;
+        printf("You have sold %ix %s for $%.2f!\nVisitor leaves happy.\n", sel_item.amount, it_lst[sel_item.category][sel_item.item], sel_item.price);
+    }
+
     visitors--;
     *pBal = bal;
+
     return 0;
+}
+
+int getTradeInput(int items)
+{
+    int tNum, checkInt;
+
+    scanf("%i", &tNum);
+
+    if (tNum == 0)
+    {
+        printf("You denied the offer. The visitor left.\n");
+    }
+    else if (tNum > items)
+    {
+        tNum = getTradeInput(items);
+    }
+
+    return tNum;
 }
 
 void* visitor()
