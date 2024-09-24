@@ -1,1 +1,0 @@
-using non integer input in trade selection denies automatically, causes issues when trying to look into balance or inventory

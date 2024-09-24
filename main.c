@@ -8,7 +8,8 @@ void* visitor();
 
 int interaction(float* pBal, char item_list[4][4][16], int inv[4][4]);
 int getTradeInput(int items);
-
+int loadSave(float* pBal, int inv[4][4]);
+int save(float* pBal, int inv[4][4]);
 
 int visitors;
 int max_visitors = 10; // Max amount of visitors before more stop arriving.
@@ -33,22 +34,22 @@ int main(void)
     srand(time(NULL));
     
     float balance = 100;
-    float* pBalance = &balance;
-
-    char items[4][4][16] =
-    {
-        {"Oats", "Wheat", "Egg", "Milk Jug"},
-        {"Fire Wood", "Birch Log", "Oak Log", "Spruce Log"},
-        {"Cod", "Carp", "Trout", "Salmon"},
-        {"Chicken Breast", "Beef", "Porkchop", "Turkey"}
-    };
-
     int inventory[4][4] =
     {
         {0, 0, 0, 0},   // Farming
         {0, 0, 0, 0},   // Lumber
         {0, 0, 0, 0},   // Fishing
         {0, 0, 0, 0}    // Butcher
+    };
+
+    loadSave(&balance, inventory);
+
+    char items[4][4][16] =
+    {
+        {"Oats", "Wheat", "Egg", "Milk"},
+        {"Fire Wood", "Birch Log", "Oak Log", "Spruce Log"},
+        {"Cod", "Carp", "Trout", "Salmon"},
+        {"Chicken Breast", "Beef", "Porkchop", "Turkey"}
     };
 
     // Starts visitor arrival loop
@@ -64,7 +65,8 @@ int main(void)
         {
             case 'Q':
             case 'q':
-                printf("Quitting...\n");
+                printf("Saving and quitting...\n");
+                save(&balance, inventory);
                 return 0;
             
             case 'C':
@@ -74,7 +76,7 @@ int main(void)
                     printf("There are currently no visitors!\n");
                     break;
                 }
-                interaction(pBalance, items, inventory);
+                interaction(&balance, items, inventory);
                 break;
 
             case 'I':
@@ -112,9 +114,49 @@ int main(void)
             case 'h':
                 printf("Every action only takes one character!\n[b] -> display balance.\n[c] -> interact with visitor.\n[h] -> display this menu.\n[i] -> display inventory.\n[q] -> quit.\n");
                 break;
+
         }
     }
 
+    return 0;
+}
+
+int loadSave(float* pBal, int inv[4][4])
+{
+    FILE *saveFile;
+    saveFile = fopen("save", "r");
+    if (saveFile == NULL)
+    {
+        return 0;
+    }
+    *pBal = (float) getw(saveFile) / 100;
+    for (int i = 0; i < 4; i++)
+    {
+        for (int j = 0; j < 4; j++)
+        {
+            inv[i][j] = getw(saveFile);
+        }
+    }
+    fclose(saveFile);
+
+    return 0;
+}
+
+int save(float* pBal, int inv[4][4])
+{
+    FILE *saveFile;
+    saveFile = fopen("save", "w");
+    int nBal = (int) (*pBal * 100);
+    putw(nBal, saveFile);
+    for (int i = 0; i < 4; i++)
+    {
+        for (int j = 0; j < 4; j++)
+        {
+            putw(inv[i][j], saveFile);
+        }
+    }
+    
+    fclose(saveFile);
     return 0;
 }
 
@@ -191,7 +233,7 @@ int interaction(float* pBal, char it_lst[4][4][16], int inv[4][4])
 
 int getTradeInput(int items)
 {
-    int tNum, checkInt;
+    int tNum;
 
     scanf("%i", &tNum);
 
