@@ -13,7 +13,7 @@ int save(float* pBal, int inv[4][4]);
 
 int visitors;
 int max_visitors = 10; // Max amount of visitors before more stop arriving.
-int visitor_frequency = 10; // A new visitor will appear every x seconds.
+int visitor_frequency = 30; // A new visitor will appear every x seconds.
 
 struct item
 {
