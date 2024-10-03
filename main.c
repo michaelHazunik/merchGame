@@ -1,4 +1,3 @@
-#include <linux/limits.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,7 +5,7 @@
 #include <string.h>
 
 
-const int visitor_frequency = 5; // A new visitor will appear every x seconds.
+const int visitor_frequency = 60; // A new visitor will appear every x seconds.
 
 struct item
 {
