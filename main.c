@@ -6,7 +6,7 @@
 #include <string.h>
 
 
-const int visitor_frequency = 2; // A new visitor will appear every x seconds.
+const int visitor_frequency = 5; // A new visitor will appear every x seconds.
 
 struct item
 {
@@ -25,7 +25,7 @@ struct offer {
 struct visitor {
     int active;
     char name[16];
-    char profession[16];
+    char category[16];
     struct offer offer;
 };
 
@@ -43,6 +43,8 @@ char item_list[4][4][16] =
 };
 
 char names [4] [8] [16];
+char categories [4] [16] = {"Farming", "Lumber", "Fishing", "Butchery"};
+
 
 void* visitor(void *v);
 
@@ -50,8 +52,7 @@ void fetchNames();
 void interaction(float* pBal, int inv[4][4], struct visitors* vTT);
 void remove_visitor(struct visitor *array[10], int index, int array_length);
 int generate_visitor_data(struct visitors* v);
-int getVisitor(int visitor_amount);
-int getTradeInput(int items);
+int getNumberInput(int lowerAs, int largerAs);
 int display_offer(struct visitor v);
 int loadSave(float* pBal, int inv[4][4]);
 int save(float* pBal, int inv[4][4]);
@@ -103,6 +104,12 @@ int main(void)
                 printf("Saving and quitting...\n");
                 save(&balance, inventory);
                 return 0;
+
+            case 'S':
+            case 's':
+                printf("Saving...\n");
+                save(&balance, inventory);
+                break;
             
             case 'C':
             case 'c':
@@ -219,14 +226,16 @@ void interaction(float* pBal, int inv[4][4], struct visitors* vTT)
     
     struct visitor empty_vis = {0};
     
+    char intent [2] = "BS";
     for (int i = 0; i < 8; i++)
     {
-        printf("[%i]\t%s %s\n", i + 1, vTT->visitor[i].profession, vTT->visitor[i].name);
+        if (vTT->visitor[i].active == 0) printf("[%i]\n", i + 1);
+        else printf("[%i] [%s]\t[%c]  %s\n", i + 1, vTT->visitor[i].category, intent[vTT->visitor[i].offer.intention], vTT->visitor[i].name);
     }
 
-    int select_visitor = getVisitor(vTT->amount);
+    int select_visitor = getNumberInput(49, 56);
     
-    if (select_visitor < 1 || select_visitor > vTT->amount)
+    if (vTT->visitor[select_visitor].active == 0)
     {
         return;
     }
@@ -235,11 +244,18 @@ void interaction(float* pBal, int inv[4][4], struct visitors* vTT)
 
     struct offer offer = vTT->visitor[select_visitor].offer;
 
-    int tradeNum = getTradeInput(offer.amount);
+    int tradeNum = getNumberInput(48, 48 + offer.amount);
+
     if (tradeNum == 0)
     {
+        printf("%s has left.\n", vTT->visitor[select_visitor].name);
         vTT->amount--;
         vTT->visitor[select_visitor] = empty_vis;
+        return;
+    }
+
+    if (tradeNum == 10)
+    {
         return;
     }
 
@@ -251,7 +267,7 @@ void interaction(float* pBal, int inv[4][4], struct visitors* vTT)
     {
         if (bal < sel_item.price)
         {
-            printf("You can't afford this purchase!\nVisitor has left.\n");
+            printf("You can't afford this purchase!\n");
             return;
         }
         bal -= sel_item.price;
@@ -262,7 +278,7 @@ void interaction(float* pBal, int inv[4][4], struct visitors* vTT)
     {
         if (inv[sel_item.category][sel_item.item] < sel_item.amount)
         {
-            printf("You do not have enough items for this sale!\nVisitor has left.\n");
+            printf("You do not have enough items for this sale!\n");
             return;
         }
         bal += sel_item.price;
@@ -273,46 +289,27 @@ void interaction(float* pBal, int inv[4][4], struct visitors* vTT)
     vTT->amount--;
     vTT->visitor[select_visitor] = empty_vis;
     *pBal = bal;
+
+    return;
 }
 
-int getVisitor(int visitor_amount)
+int getNumberInput(int lowerAs, int largerAs)
 {
     char s = 10;
-    while (s == 10)
-    {
-        s = getchar();
-    }
+    while (s == 10) s = getchar();
     
-    if (s < 49 || s > 56)
-    {
-        return 10;
-    }
+    if (s < lowerAs || s > largerAs) return 10;
 
-    return s - 49;
+    return s - lowerAs;
 }
 
-int getTradeInput(int items)
-{
-    int s;
-
-    scanf("%i", &s);
-
-    if (s == 0)
-    {
-        printf("You denied the offer. The visitor left.\n");
-    }
-    else if (s > items)
-    {
-        s = getTradeInput(items);
-    }
-
-    return s;
-}
+//    if (s < 48 || s > 49 + items - 1)
 
 int display_offer(struct visitor v)
 {
     char int_opts[2][5] = {"buy\0", "sell\0"};
     printf("%s would like to %s:\n", v.name, int_opts[v.offer.intention]);
+    printf("[0]\tLeave\n");
     for (int i = 0; i < v.offer.amount; i++)
     {
         struct item item = v.offer.items[i];
@@ -359,8 +356,6 @@ int generate_visitor_data(struct visitors* v)
         offer.items[i] = item;
     }
 
-    char professions[4][16] = {"Farmer", "Lumberjack", "Fisherman", "Butcher"};
-
     struct visitor visitor =
     {
         .active = 1,
@@ -369,7 +364,7 @@ int generate_visitor_data(struct visitors* v)
     int getPerson = rand() % 8;
     for (int i = 0; i < 16; i++)
     {
-        visitor.profession [i] = professions [cat] [i];
+        visitor.category [i] = categories [cat] [i];
         if (names [cat] [getPerson] [i] == '\n')
         {
             continue;
@@ -403,7 +398,7 @@ void* visitor(void *v)
         if (visitors->amount < 8)
         {
             slot = generate_visitor_data(v);
-            printf("%s %s has arrived! (%i/8)\n", visitors->visitor[slot].profession, visitors->visitor[slot].name, visitors->amount + 1);
+            printf("%s has arrived! (%i/8)\n", visitors->visitor[slot].name, visitors->amount + 1);
             visitors->amount++;
         }
     }
