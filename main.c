@@ -4,9 +4,6 @@
 #include <unistd.h>
 #include <string.h>
 
-
-const int visitor_frequency = 60; // A new visitor will appear every x seconds.
-
 struct item
 {
     int amount;
@@ -29,6 +26,7 @@ struct visitor {
 };
 
 struct visitors {
+    int frequency;
     int amount;
     struct visitor visitor[8];
 };
@@ -50,16 +48,18 @@ void* visitor(void *v);
 void fetchNames();
 void interaction(float* pBal, int inv[4][4], struct visitors* vTT);
 void remove_visitor(struct visitor *array[10], int index, int array_length);
+void upgrades(float *bal, struct visitors* vTT);
 int generate_visitor_data(struct visitors* v);
 int getNumberInput(int lowerAs, int largerAs);
 int display_offer(struct visitor v);
-int loadSave(float* pBal, int inv[4][4]);
-int save(float* pBal, int inv[4][4]);
+int loadSave(float* pBal, int inv[4][4], struct visitors* vTT);
+int save(float* pBal, int inv[4][4], struct visitors* vTT);
 
 int main(void)
 {
     struct visitors visitors =
     {
+        .frequency = 60,
         .amount = 0,
     };
 
@@ -82,11 +82,11 @@ int main(void)
         {0, 0, 0, 0}    // Butcher
     };
 
-    loadSave(&balance, inventory);
-
-    
     struct visitors *vTT = malloc(sizeof(*vTT));
     *vTT = visitors;
+
+    loadSave(&balance, inventory, vTT);
+
     // Starts visitor arrival loop
     pthread_t visitorT;
     pthread_create(&visitorT, NULL, visitor, vTT);
@@ -101,13 +101,13 @@ int main(void)
             case 'Q':
             case 'q':
                 printf("Saving and quitting...\n");
-                save(&balance, inventory);
+                save(&balance, inventory, vTT);
                 return 0;
 
             case 'S':
             case 's':
                 printf("Saving...\n");
-                save(&balance, inventory);
+                save(&balance, inventory, vTT);
                 break;
             
             case 'C':
@@ -156,9 +156,15 @@ int main(void)
                 printf("Every action only takes one character!\n[b] -> display balance.\n[c] -> interact with visitor.\n[h] -> display this menu.\n[i] -> display inventory.\n[q] -> quit.\n");
                 break;
 
+            case 'U':
+            case 'u':
+                upgrades(&balance, vTT);
+                break;
+
         }
     }
 
+    free(vTT);
     return 0;
 }
 
@@ -180,7 +186,41 @@ void fetchNames()
     fclose(nameFile);
 }
 
-int loadSave(float* pBal, int inv[4][4])
+void upgrades(float *bal, struct visitors* vTT)
+{
+    float price;
+    printf("--- <  UPGRADES  > ---\n\n[0] Exit\n[1] Visitor Frequency\n");
+    int selection = getNumberInput(48, 49);
+    
+    switch (selection)
+    {
+        case 0:
+            return;
+
+        case 1:
+            price = (float) 15 * (61 - vTT->frequency);
+            printf("Visitor Frequency (%i)\n-5s for $%.2f\n[0] Deny\n[1] Accept\n", vTT->frequency, price);
+            selection = getNumberInput(48, 49);
+            if (selection == 0)
+            {
+                return;
+            }
+            
+            if (*bal < price)
+            {
+                printf("You can't afford this upgrade!\n");
+                return;
+            }
+
+            *bal -= price;
+            vTT->frequency -= 5;
+
+            break;
+    }
+    
+}
+
+int loadSave(float* pBal, int inv[4][4], struct visitors* vTT)
 {
     FILE *saveFile;
     saveFile = fopen("save", "r");
@@ -189,6 +229,7 @@ int loadSave(float* pBal, int inv[4][4])
         return 0;
     }
     *pBal = (float) getw(saveFile) / 100;
+    vTT->frequency = getw(saveFile);
     for (int i = 0; i < 4; i++)
     {
         for (int j = 0; j < 4; j++)
@@ -201,12 +242,13 @@ int loadSave(float* pBal, int inv[4][4])
     return 0;
 }
 
-int save(float* pBal, int inv[4][4])
+int save(float* pBal, int inv[4][4], struct visitors* vTT)
 {
     FILE *saveFile;
     saveFile = fopen("save", "w");
     int nBal = (int) (*pBal * 100);
     putw(nBal, saveFile);
+    putw(vTT->frequency, saveFile);
     for (int i = 0; i < 4; i++)
     {
         for (int j = 0; j < 4; j++)
@@ -393,7 +435,7 @@ void* visitor(void *v)
     while (1)
     {
         struct visitors *visitors = v;
-        sleep(visitor_frequency);
+        sleep(visitors->frequency);
         if (visitors->amount < 8)
         {
             slot = generate_visitor_data(v);
