@@ -49,14 +49,16 @@ void fetchNames();
 void interaction(float* pBal, int inv[4][4], struct visitors* vTT);
 void remove_visitor(struct visitor *array[10], int index, int array_length);
 void upgrades(float *bal, struct visitors* vTT);
+char getSave();
 int generate_visitor_data(struct visitors* v);
 int getNumberInput(int lowerAs, int largerAs);
 int display_offer(struct visitor v);
-int loadSave(float* pBal, int inv[4][4], struct visitors* vTT);
-int save(float* pBal, int inv[4][4], struct visitors* vTT);
+int loadSave(char sel, float* pBal, int inv[4][4], struct visitors* vTT);
+int save(char sel, float* pBal, int inv[4][4], struct visitors* vTT);
 
 int main(void)
 {
+    const char selectadSave = getSave();
     struct visitors visitors =
     {
         .frequency = 60,
@@ -85,7 +87,7 @@ int main(void)
     struct visitors *vTT = malloc(sizeof(*vTT));
     *vTT = visitors;
 
-    loadSave(&balance, inventory, vTT);
+    loadSave(selectadSave, &balance, inventory, vTT);
 
     // Starts visitor arrival loop
     pthread_t visitorT;
@@ -101,13 +103,13 @@ int main(void)
             case 'Q':
             case 'q':
                 printf("Saving and quitting...\n");
-                save(&balance, inventory, vTT);
+                save(selectadSave, &balance, inventory, vTT);
                 return 0;
 
             case 'S':
             case 's':
                 printf("Saving...\n");
-                save(&balance, inventory, vTT);
+                save(selectadSave, &balance, inventory, vTT);
                 break;
             
             case 'C':
@@ -168,6 +170,15 @@ int main(void)
     return 0;
 }
 
+char getSave()
+{
+    int x;
+    printf("Select a save (0-9)\n");
+    do x = getchar();
+    while (x < 48 || x > 57);
+    return x;
+}
+
 void fetchNames()
 {
     FILE *nameFile;
@@ -220,13 +231,15 @@ void upgrades(float *bal, struct visitors* vTT)
     
 }
 
-int loadSave(float* pBal, int inv[4][4], struct visitors* vTT)
+int loadSave(char sel, float* pBal, int inv[4][4], struct visitors* vTT)
 {
+    char file_name [13] = "saves/save_#\0";
+    file_name [11] = sel;
     FILE *saveFile;
-    saveFile = fopen("save", "r");
+    saveFile = fopen(file_name, "r");
     if (saveFile == NULL)
     {
-        return 0;
+        return 1;
     }
     *pBal = (float) getw(saveFile) / 100;
     vTT->frequency = getw(saveFile);
@@ -242,10 +255,12 @@ int loadSave(float* pBal, int inv[4][4], struct visitors* vTT)
     return 0;
 }
 
-int save(float* pBal, int inv[4][4], struct visitors* vTT)
+int save(char sel, float* pBal, int inv[4][4], struct visitors* vTT)
 {
+    char file_name [13] = "saves/save_#\0";
+    file_name [11] = sel;
     FILE *saveFile;
-    saveFile = fopen("save", "w");
+    saveFile = fopen(file_name, "w");
     int nBal = (int) (*pBal * 100);
     putw(nBal, saveFile);
     putw(vTT->frequency, saveFile);
