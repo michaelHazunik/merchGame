@@ -13,7 +13,7 @@ struct item
 };
 
 struct offer {
-    int intention;          // 0 = Buy, 1 = Sell
+    int intention;
     int amount;
     struct item items[4];
 };
@@ -26,6 +26,7 @@ struct visitor {
 };
 
 struct visitors {
+    int max_visitors;
     int frequency;
     int amount;
     struct visitor visitor[8];
@@ -45,35 +46,41 @@ char categories [4] [16] = {"Farming", "Lumber", "Fishing", "Butchery"};
 
 void* visitor(void *v);
 
-void fetchNames();
+void fetch_names();
 void interaction(float* pBal, int inv[4][4], struct visitors* vTT);
 void remove_visitor(struct visitor *array[10], int index, int array_length);
 void upgrades(float *bal, struct visitors* vTT);
-char getSave();
+void sort_visitors(struct visitors* v);
+char get_save();
+int upgrade(float *bal, float price);
 int generate_visitor_data(struct visitors* v);
-int getNumberInput(int lowerAs, int largerAs);
+int get_number_input(int low, int high);
 int display_offer(struct visitor v);
-int loadSave(char sel, float* pBal, int inv[4][4], struct visitors* vTT);
+int load_save(char sel, float* pBal, int inv[4][4], struct visitors* vTT);
 int save(char sel, float* pBal, int inv[4][4], struct visitors* vTT);
 
 int main(void)
 {
-    const char selectadSave = getSave();
+    srand(time(NULL));
+    const char selectadSave = get_save();
+    char move;
     struct visitors visitors =
     {
+        .max_visitors = 4,
         .frequency = 60,
         .amount = 0,
     };
 
-    for (int i = 0; i < 8; i++)
+    struct visitors *vTT = malloc(sizeof(*vTT));
+    *vTT = visitors;
+
+    for (int i = 0; i < vTT->max_visitors; i++)
     {
         struct visitor vis = {0};
         visitors.visitor[i] = vis;
     }
 
-    fetchNames();
-
-    srand(time(NULL));
+    fetch_names();
     
     float balance = 100;
     int inventory[4][4] =
@@ -84,17 +91,11 @@ int main(void)
         {0, 0, 0, 0}    // Butcher
     };
 
-    struct visitors *vTT = malloc(sizeof(*vTT));
-    *vTT = visitors;
+    load_save(selectadSave, &balance, inventory, vTT);
 
-    loadSave(selectadSave, &balance, inventory, vTT);
-
-    // Starts visitor arrival loop
     pthread_t visitorT;
     pthread_create(&visitorT, NULL, visitor, vTT);
 
-    char move;
-    //Game Loop
     while (1)
     {
         move = getchar();
@@ -170,7 +171,7 @@ int main(void)
     return 0;
 }
 
-char getSave()
+char get_save()
 {
     int x;
     printf("Select a save (0-9)\n");
@@ -179,7 +180,7 @@ char getSave()
     return x;
 }
 
-void fetchNames()
+void fetch_names()
 {
     FILE *nameFile;
     nameFile = fopen("names.txt", "r");
@@ -197,11 +198,40 @@ void fetchNames()
     fclose(nameFile);
 }
 
+int upgrade(float *bal, float price)
+{
+    int selection = get_number_input(48, 49);
+    if (selection == 0)
+    {
+        return 1;
+    }
+    
+    if (*bal < price)
+    {
+        printf("You can't afford this upgrade!\n");
+        return 1;
+    }
+
+    *bal -= price;
+    return 0;
+}
+
+void sort_visitors(struct visitors* v)
+{
+    int x = 0;
+    for (int i = 0; i < v->max_visitors; i++)
+    {
+        if (v->visitor[i].active == 0) x++;
+        if (x > 0) v->visitor[i] = v->visitor[i + 1];
+    }
+    return;
+}
+
 void upgrades(float *bal, struct visitors* vTT)
 {
     float price;
-    printf("--- <  UPGRADES  > ---\n\n[0] Exit\n[1] Visitor Frequency\n");
-    int selection = getNumberInput(48, 49);
+    printf("--- <  UPGRADES  > ---\n\n[0] Exit\n[1] Visitor Frequency\n[2] Max Visitors\n");
+    int selection = get_number_input(48, 50);
     
     switch (selection)
     {
@@ -210,28 +240,20 @@ void upgrades(float *bal, struct visitors* vTT)
 
         case 1:
             price = (float) 15 * (61 - vTT->frequency);
-            printf("Visitor Frequency (%i)\n-5s for $%.2f\n[0] Deny\n[1] Accept\n", vTT->frequency, price);
-            selection = getNumberInput(48, 49);
-            if (selection == 0)
-            {
-                return;
-            }
-            
-            if (*bal < price)
-            {
-                printf("You can't afford this upgrade!\n");
-                return;
-            }
-
-            *bal -= price;
-            vTT->frequency -= 5;
-
+            printf("Visitor Frequency (%is)\n-1s for $%.2f\n[0] Deny\n[1] Accept\n", vTT->frequency, price);
+            if (upgrade(bal, price) == 0) vTT->frequency--;
+            break;
+        
+        case 2:
+            price = (float) 250 * (vTT->max_visitors - 3);
+            printf("Max visitors (%i)\n+1 for $%.2f\n[0] Deny\n[1] Accept\n", vTT->max_visitors, price);
+            if (upgrade(bal, price) == 0) vTT->max_visitors++;
             break;
     }
     
 }
 
-int loadSave(char sel, float* pBal, int inv[4][4], struct visitors* vTT)
+int load_save(char sel, float* pBal, int inv[4][4], struct visitors* vTT)
 {
     char file_name [13] = "saves/save_#\0";
     file_name [11] = sel;
@@ -243,6 +265,7 @@ int loadSave(char sel, float* pBal, int inv[4][4], struct visitors* vTT)
     }
     *pBal = (float) getw(saveFile) / 100;
     vTT->frequency = getw(saveFile);
+    vTT->max_visitors = getw(saveFile);
     for (int i = 0; i < 4; i++)
     {
         for (int j = 0; j < 4; j++)
@@ -264,6 +287,7 @@ int save(char sel, float* pBal, int inv[4][4], struct visitors* vTT)
     int nBal = (int) (*pBal * 100);
     putw(nBal, saveFile);
     putw(vTT->frequency, saveFile);
+    putw(vTT->max_visitors, saveFile);
     for (int i = 0; i < 4; i++)
     {
         for (int j = 0; j < 4; j++)
@@ -279,17 +303,17 @@ int save(char sel, float* pBal, int inv[4][4], struct visitors* vTT)
 void interaction(float* pBal, int inv[4][4], struct visitors* vTT)
 {
     float bal = *pBal;
-    
+    sort_visitors(vTT);
     struct visitor empty_vis = {0};
     
     char intent [2] = "BS";
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < vTT->amount; i++)
     {
         if (vTT->visitor[i].active == 0) printf("[%i]\n", i + 1);
         else printf("[%i] [%s]\t[%c]  %s\n", i + 1, vTT->visitor[i].category, intent[vTT->visitor[i].offer.intention], vTT->visitor[i].name);
     }
 
-    int select_visitor = getNumberInput(49, 56);
+    int select_visitor = get_number_input(49, 49 + vTT->amount);
     
     if (vTT->visitor[select_visitor].active == 0)
     {
@@ -300,7 +324,7 @@ void interaction(float* pBal, int inv[4][4], struct visitors* vTT)
 
     struct offer offer = vTT->visitor[select_visitor].offer;
 
-    int tradeNum = getNumberInput(48, 48 + offer.amount);
+    int tradeNum = get_number_input(48, 48 + offer.amount);
 
     if (tradeNum == 0)
     {
@@ -349,17 +373,15 @@ void interaction(float* pBal, int inv[4][4], struct visitors* vTT)
     return;
 }
 
-int getNumberInput(int lowerAs, int largerAs)
+int get_number_input(int low, int high)
 {
     char s = 10;
     while (s == 10) s = getchar();
     
-    if (s < lowerAs || s > largerAs) return 10;
+    if (s < low || s > high) return 10;
 
-    return s - lowerAs;
+    return s - low;
 }
-
-//    if (s < 48 || s > 49 + items - 1)
 
 int display_offer(struct visitor v)
 {
@@ -370,9 +392,7 @@ int display_offer(struct visitor v)
     {
         struct item item = v.offer.items[i];
         printf("[%i]\t$", i + 1);
-        if (item.price < 1000){printf(" ");}
-        if (item.price < 100){printf(" ");}
-        if (item.price < 10){printf(" ");}
+        for (float j = 1000; j > item.price && j > 1; j /= 10){printf("");}
         printf("%.2f  %ix  %s\n", item.price, item.amount, item_list[item.category][item.item]);
     }
 
@@ -382,7 +402,7 @@ int display_offer(struct visitor v)
 int generate_visitor_data(struct visitors* v)
 {
     int free_slot;
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < v->max_visitors; i++)
     {
         if (v->visitor[i].active == 0)
         {
@@ -430,7 +450,7 @@ int generate_visitor_data(struct visitors* v)
 
     int first_free_slot = 10; 
 
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < v->max_visitors; i++)
     {
         if (v->visitor[i].active == 0)
         {
@@ -451,11 +471,11 @@ void* visitor(void *v)
     {
         struct visitors *visitors = v;
         sleep(visitors->frequency);
-        if (visitors->amount < 8)
+        if (visitors->amount < visitors->max_visitors)
         {
             slot = generate_visitor_data(v);
-            printf("%s has arrived! (%i/8)\n", visitors->visitor[slot].name, visitors->amount + 1);
             visitors->amount++;
+            printf("%s has arrived! (%i/%i)\n", visitors->visitor[slot].name, visitors->amount, visitors->max_visitors);
         }
     }
     return NULL;
